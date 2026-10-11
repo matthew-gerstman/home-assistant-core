@@ -70,11 +70,18 @@ def request_handler_factory(
             except NoURLAvailableError:
                 # Omit header to avoid leaking configured URLs
                 raise HTTPUnauthorized from None
+            # Scope the metadata URL to the requested resource (RFC9728
+            # path-inserted well-known URI) so strict clients validating the
+            # "resource" field against the URL they called (e.g. Claude.ai,
+            # ChatGPT connectors) can complete discovery.
+            resource_metadata_path = "/.well-known/oauth-protected-resource"
+            if request.path not in ("", "/"):
+                resource_metadata_path += request.path
             raise HTTPUnauthorized(
                 headers={
                     "WWW-Authenticate": (
                         f'Bearer resource_metadata="{url_prefix}'
-                        '/.well-known/oauth-protected-resource"'
+                        f'{resource_metadata_path}"'
                     )
                 }
             )

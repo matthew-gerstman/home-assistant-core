@@ -490,6 +490,33 @@ async def test_well_known_protected_resource(
 
 
 @pytest.mark.usefixtures("current_request_with_host")  # Has example.com host
+async def test_well_known_protected_resource_scoped_to_resource_path(
+    hass: HomeAssistant,
+    aiohttp_client: ClientSessionGenerator,
+) -> None:
+    """Test the protected resource metadata is scoped to a path-suffixed resource.
+
+    This is the RFC9728 path-inserted well-known URI used by remote MCP
+    clients (e.g. Claude.ai, ChatGPT) to discover metadata scoped to the
+    exact resource they are calling, such as /api/mcp.
+    """
+    await async_process_ha_core_config(
+        hass,
+        {"external_url": "https://example.com"},
+    )
+    client = await async_setup_auth(hass, aiohttp_client, setup_api=True)
+    resp = await client.get(
+        "/.well-known/oauth-protected-resource/api/mcp",
+    )
+    assert resp.status == 200
+    assert await resp.json() == {
+        "resource": "https://example.com/api/mcp",
+        "authorization_servers": ["https://example.com"],
+        "resource_documentation": "https://developers.home-assistant.io/docs/auth_api",
+    }
+
+
+@pytest.mark.usefixtures("current_request_with_host")  # Has example.com host
 async def test_well_known_protected_resource_no_url(
     hass: HomeAssistant,
     aiohttp_client: ClientSessionGenerator,
@@ -590,6 +617,10 @@ async def test_login_flow_pkce_validation(
             "/.well-known/oauth-authorization-server", id="authorization-server"
         ),
         pytest.param("/.well-known/oauth-protected-resource", id="protected-resource"),
+        pytest.param(
+            "/.well-known/oauth-protected-resource/api/mcp",
+            id="protected-resource-scoped",
+        ),
     ],
 )
 async def test_well_known_auth_info_allows_cors(

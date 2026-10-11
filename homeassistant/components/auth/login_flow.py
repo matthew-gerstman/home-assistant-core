@@ -163,14 +163,21 @@ class WellKnownOAuthInfoView(HomeAssistantView):
 
 
 class WellKnownProtectedResourceView(HomeAssistantView):
-    """View to host the OAuth2 Protected Resource Metadata per RFC9728."""
+    """View to host the OAuth2 Protected Resource Metadata per RFC9728.
+
+    RFC9728 allows a protected resource that lives at a path (e.g. /api/mcp)
+    to publish its metadata at a path-inserted well-known URI, so that
+    clients can discover metadata scoped to the exact resource they are
+    calling instead of a generic host-wide document.
+    """
 
     requires_auth = False
     cors_allowed = True
     url = "/.well-known/oauth-protected-resource"
+    extra_urls = ["/.well-known/oauth-protected-resource/{resource_path:.+}"]
     name = "well-known/oauth-protected-resource"
 
-    async def get(self, request: web.Request) -> web.Response:
+    async def get(self, request: web.Request, resource_path: str = "") -> web.Response:
         """Return the protected resource metadata."""
         hass = request.app[KEY_HASS]
         try:
@@ -178,9 +185,11 @@ class WellKnownProtectedResourceView(HomeAssistantView):
         except NoURLAvailableError:
             return self.json_message("No URL available", HTTPStatus.NOT_FOUND)
 
+        resource = f"{url_prefix}/{resource_path}" if resource_path else url_prefix
+
         return self.json(
             {
-                "resource": url_prefix,
+                "resource": resource,
                 "authorization_servers": [url_prefix],
                 "resource_documentation": (
                     "https://developers.home-assistant.io/docs/auth_api"

@@ -364,6 +364,13 @@ async def test_http_requires_authentication(
     response = await client.request(method, path)
     assert response.status == HTTPStatus.UNAUTHORIZED
 
+    # Scoped to the resource path per RFC9728, not the generic host-wide
+    # metadata URL (the `auth` component isn't set up in this test, so the
+    # exact host prefix is verified separately in test_view.py).
+    www_authenticate = response.headers["WWW-Authenticate"]
+    assert www_authenticate.startswith('Bearer resource_metadata="')
+    assert www_authenticate.endswith(f'/.well-known/oauth-protected-resource{path}"')
+
 
 @pytest.fixture(params=["sse", "streamable"])
 def mcp_protocol(request: pytest.FixtureRequest):

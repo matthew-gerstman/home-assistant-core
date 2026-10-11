@@ -30,7 +30,7 @@ from homeassistant.helpers.network import NoURLAvailableError
 @pytest.fixture
 def mock_request() -> Mock:
     """Mock a request."""
-    return Mock(app={KEY_HASS: Mock(is_stopping=False)}, match_info={})
+    return Mock(app={KEY_HASS: Mock(is_stopping=False)}, match_info={}, path="/")
 
 
 @pytest.fixture
@@ -126,6 +126,30 @@ async def test_requires_auth_includes_www_authenticate(
     assert exc_info.value.headers["WWW-Authenticate"] == (
         "Bearer resource_metadata="
         '"https://example.com/.well-known/oauth-protected-resource"'
+    )
+
+
+async def test_requires_auth_www_authenticate_scoped_to_resource_path(
+    mock_request: Mock,
+) -> None:
+    """Test 401 responses scope resource_metadata to the requested resource path."""
+    mock_request.get = Mock(return_value=False)
+    mock_request.path = "/api/mcp"
+    with (
+        patch(
+            "homeassistant.helpers.network.get_url",
+            return_value="https://example.com",
+        ),
+        pytest.raises(HTTPUnauthorized) as exc_info,
+    ):
+        await request_handler_factory(
+            mock_request.app[KEY_HASS],
+            Mock(requires_auth=True),
+            AsyncMock(),
+        )(mock_request)
+    assert exc_info.value.headers["WWW-Authenticate"] == (
+        "Bearer resource_metadata="
+        '"https://example.com/.well-known/oauth-protected-resource/api/mcp"'
     )
 
 
